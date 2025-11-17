@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+src/das_whisper/__main__.py
+src/das_whisper/audio_utils.py
+src/das_whisper/datautils.py
+src/das_whisper/evaluate.py
+src/das_whisper/model.py
+src/das_whisper/predict.py
+src/das_whisper/train.py
+src/das_whisper/train_lightning.py
+src/das_whisper/utils.py
+src/das_whisper.egg-info/PKG-INFO
+src/das_whisper.egg-info/SOURCES.txt
+src/das_whisper.egg-info/dependency_links.txt
+src/das_whisper.egg-info/entry_points.txt
+src/das_whisper.egg-info/requires.txt
+src/das_whisper.egg-info/top_level.txt

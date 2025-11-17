@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "das-whisper"
+version = "0.1.0"
+description = "Utilities and training scripts for the Whisper-based segmentation models."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "transformers==4.57.1",
+    "peft==0.18.0",
+    "accelerate==1.11.0",
+    "scipy",
+    "jupyterlab",
+    "librosa",
+    "ipywidgets",
+    "matplotlib",
+    "pandas",
+    "defopt",
+    "pytorch-lightning",
+]
+
+[project.scripts]
+das-whisper = "das_whisper.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
