@@ -1,2 +1,0 @@
-[console_scripts]
-das-whisper = das_whisper.__main__:main

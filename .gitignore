@@ -5,3 +5,4 @@ __pycache__/
 data/datasets
 wandb/
 temp/
+src/*.egg-info
