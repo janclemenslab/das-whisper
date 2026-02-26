@@ -10,7 +10,7 @@ conda activate wseg
 uv pip install -e . --upgrade
 ```
 
-## User
+## Usage
 
 ```shell
 das-whisper train -h
