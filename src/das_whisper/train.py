@@ -10,7 +10,6 @@ import time
 import shutil
 import json
 import defopt
-from .audio_utils import SpecViewer, WhisperSegFeatureExtractor
 from .utils import *
 from .model import *
 from .datautils import *
@@ -52,6 +51,31 @@ def run(
     clear_cluster_codebook: int = 1,
     ignore_cluster: int = 0,
 ):
+    """Train a whisperseg model
+
+    The argument `initial_model_path` can point to a local folder or to a pretrained model on huggingface:
+    - openai/whisper-large
+    - openai/whisper-medium
+    - openai/whisper-small
+    - openai/whisper-base
+    - openai/whisper-tiny
+    - nccratliri/whisperseg-large-ms
+    - nccratliri/whisperseg-animal-vad
+    - nccratliri/whisperseg-base-animal-vad
+    - nccratliri/whisperseg-canary
+    - nccratliri/whisper-large
+
+    The argument `train_dataset_folder` can point to a local folder or to a dataset on huggingface:
+    - nccratliri/bengalese-finch-subset-with-csv-label
+    - nccratliri/vad-animals
+    - nccratliri/whisperseg-conda-env
+    - nccratliri/vad-multi-species
+    - nccratliri/vad-zebra-finch
+    - nccratliri/vad-bengalese-finch
+    - nccratliri/vad-marmoset
+    - nccratliri/vad-mouse
+    - nccratliri/vad-human-ava-speech
+    """
     if seed is not None:
         np.random.seed(seed)
 
@@ -96,10 +120,14 @@ def run(
         segmenter.update_cluster_codebook({})
 
     # scaler = torch.cuda.amp.GradScaler()
+    print(train_dataset_folder)
+    train_dataset_folder = download_data(train_dataset_folder, local_data_path="datasets")
 
     audio_path_list_train, label_path_list_train = get_audio_and_label_paths(train_dataset_folder)
 
-    default_config = determine_default_config(audio_path_list_train, label_path_list_train, total_spec_columns, ignore_cluster=ignore_cluster)
+    default_config = determine_default_config(
+        audio_path_list_train, label_path_list_train, total_spec_columns, ignore_cluster=ignore_cluster
+    )
     ## store the default segmentation config
     segmenter.model.config.default_segmentation_config = default_config
     segmenter.default_segmentation_config = default_config
@@ -117,7 +145,9 @@ def run(
     )
 
     if val_ratio > 0:
-        (audio_list_train, label_list_train), (audio_list_val, label_list_val) = train_val_split(audio_list_train, label_list_train, val_ratio)
+        (audio_list_train, label_list_train), (audio_list_val, label_list_val) = train_val_split(
+            audio_list_train, label_list_train, val_ratio
+        )
 
     audio_list_train, label_list_train = slice_audios_and_labels(audio_list_train, label_list_train, total_spec_columns)
 
@@ -156,7 +186,9 @@ def run(
             max_num_epochs = int(np.ceil(max_num_iterations / len(training_dataloader)))
 
     if lr_schedule == "linear":
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_num_iterations)
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_num_iterations
+        )
     else:
         scheduler = None
 
@@ -191,7 +223,9 @@ def run(
 
             current_time = time.time()
             current_progress = int(np.round(current_step / max_num_iterations * 100))
-            eta = int((current_time - start_time) / (current_step / max_num_iterations) * (1 - current_step / max_num_iterations))
+            eta = int(
+                (current_time - start_time) / (current_step / max_num_iterations) * (1 - current_step / max_num_iterations)
+            )
             eta_hours = eta // 3600
             eta_minutes = (eta % 3600) // 60
             eta_seconds = (eta % 3600) % 60
@@ -203,10 +237,15 @@ def run(
             progress = current_progress
 
             if current_step % print_every == 0:
-                print("Epoch: %d, current_step: %d, learning rate: %f, Loss: %.4f" % (epoch, current_step, get_lr(optimizer)[0], np.mean(training_loss_value_list)))
+                print(
+                    "Epoch: %d, current_step: %d, learning rate: %f, Loss: %.4f"
+                    % (epoch, current_step, get_lr(optimizer)[0], np.mean(training_loss_value_list))
+                )
                 training_loss_value_list = []
 
-            if (validate_every is not None and current_step % validate_every == 0) or (validate_per_epoch and count == len(training_dataloader) - 1):
+            if (validate_every is not None and current_step % validate_every == 0) or (
+                validate_per_epoch and count == len(training_dataloader) - 1
+            ):
                 print("Start validation ...")
                 model.eval()
                 ## in the validation set, set the num_trails to 1
@@ -221,19 +260,28 @@ def run(
                     target_cluster=None,
                 )
 
-                print("Epoch: %d, current_step: %d, validation segment F1 score: %.2f, frame F1 score: %.2f" % (epoch, current_step, eval_res["segment_wise"][-1], eval_res["frame_wise"][-1]))
+                print(
+                    "Epoch: %d, current_step: %d, validation segment F1 score: %.2f, frame F1 score: %.2f"
+                    % (epoch, current_step, eval_res["segment_wise"][-1], eval_res["frame_wise"][-1])
+                )
                 val_score_history.append((current_step, (eval_res["segment_wise"][-1] + eval_res["frame_wise"][-1]) * 0.5))
 
                 model.train()
 
-            if (save_every is not None and current_step % save_every == 0) or (save_per_epoch and count == len(training_dataloader) - 1):
+            if (save_every is not None and current_step % save_every == 0) or (
+                save_per_epoch and count == len(training_dataloader) - 1
+            ):
                 model.eval()
                 save_model(model, tokenizer, current_step, model_folder, max_to_keep)
                 model.train()
 
             if current_step >= 0.5 * max_num_iterations:  ## training has been half-way done
                 ## validation score keep decreasing for 2 validation steps
-                if len(val_score_history) >= 3 and val_score_history[-1][1] < val_score_history[-2][1] and val_score_history[-2][1] < val_score_history[-3][1]:
+                if (
+                    len(val_score_history) >= 3
+                    and val_score_history[-1][1] < val_score_history[-2][1]
+                    and val_score_history[-2][1] < val_score_history[-3][1]
+                ):
                     eary_stop = True
 
             if current_step >= max_num_iterations or eary_stop:
@@ -258,8 +306,13 @@ def run(
             best_checkpoint_batch_number = int(ckpt_name.split("-")[-1])
 
     if best_checkpoint_batch_number is not None:
-        print("The best checkpoint on validation set is: %s," % (model_folder + "/checkpoint-%d" % (best_checkpoint_batch_number)))
-        os.system("cp -r %s %s" % (model_folder + "/checkpoint-%d" % (best_checkpoint_batch_number), model_folder + "/final_checkpoint"))
+        print(
+            "The best checkpoint on validation set is: %s," % (model_folder + "/checkpoint-%d" % (best_checkpoint_batch_number))
+        )
+        os.system(
+            "cp -r %s %s"
+            % (model_folder + "/checkpoint-%d" % (best_checkpoint_batch_number), model_folder + "/final_checkpoint")
+        )
         # remove other checkpoints
         os.system("rm -r %s" % (model_folder + "/checkpoint-*"))
     try:

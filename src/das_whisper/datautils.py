@@ -6,9 +6,27 @@ import threading
 from torch.utils.data import Dataset, DataLoader
 from copy import deepcopy
 import json
-
-from .audio_utils import WhisperSegFeatureExtractor, get_n_fft_given_sr, get_audio_duration, get_sampling_rate
+from .audio_utils import WhisperSegFeatureExtractor, get_n_fft_given_sr
 from .utils import RATIO_DECODING_TIME_STEP_TO_SPEC_TIME_STEP
+from typing import Union
+from huggingface_hub import snapshot_download
+import logging
+
+
+def download_data(data_path, local_data_path=Union[str, bytes, None, os.PathLike]):
+    ## If data path is an existing local folder path then return immediataly
+    if os.path.exists(data_path):
+        logging.info(f"{data_path=} is a local dataset")
+        return data_path
+    else:  # Assume it's a dataset on hugginge face and attempt to download it
+        if local_data_path is None:
+            local_data_path = "datasets"
+
+        logging.info(f"Assuming {data_path=} is a dataset on huggingface. Trying to download it.")
+        if not os.path.exists(data_path) or len(os.listdir(local_data_path)) == 0:
+            os.makedirs(local_data_path, exist_ok=True)
+            snapshot_download(data_path, local_dir=f"{local_data_path}/{os.path.basename(data_path)}", repo_type="dataset")
+        return local_data_path
 
 
 def read_label(label_path, default_config={}, ignore_cluster=False):
@@ -55,7 +73,8 @@ def get_audio_and_label_paths(folder):
 def determine_default_config(audio_paths, label_paths, total_spec_columns, ignore_cluster):
     sr_list = []
     for audio_fname in audio_paths:
-        sr_list.append(get_sampling_rate(audio_fname))
+        sr = librosa.get_samplerate(path=audio_fname)
+        sr_list.append(sr)
     assert len(sr_list) > 0, "No valid audios were provided."
     sr = int(np.median(sr_list))
     n_fft = get_n_fft_given_sr(sr)
@@ -65,7 +84,7 @@ def determine_default_config(audio_paths, label_paths, total_spec_columns, ignor
     offsets = []
     for audio_fname, label_path in zip(audio_paths, label_paths):
         label = read_label(label_path, ignore_cluster=ignore_cluster)
-        audio_dur = get_audio_duration(audio_fname)
+        audio_dur = librosa.get_duration(path=audio_fname)
 
         ## assume the time stamps in the input csv/json already eliminate the half FFT blurring effect, here we need to add the blurring effect back to cope with the sampling rate used when computing the spectrogram
         corrected_onsets = [max(0, t - time_delta) for t in label["onset"]]

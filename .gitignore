@@ -1,8 +1,16 @@
-model/
+models/
 result/
 __pycache__/
 .ipynb_checkpoints/
 data/datasets
+datasets/
+model/
 wandb/
 temp/
+data/
 src/*.egg-info
+.vscode
+.mypycache
+__pycache__
+*.pyc
+*.pyo

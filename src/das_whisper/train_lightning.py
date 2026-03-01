@@ -44,13 +44,23 @@ class WhisperSegLightningModule(pl.LightningModule):
         outputs = self.model(**batch)
         loss = outputs.loss.mean()
         self.log("train_loss", loss, prog_bar=True, on_step=True, logger=True, batch_size=batch["input_features"].size(0))
-        self.log("train_loss_epoch", loss, prog_bar=False, on_step=False, on_epoch=True, batch_size=batch["input_features"].size(0))
+        self.log(
+            "train_loss_epoch", loss, prog_bar=False, on_step=False, on_epoch=True, batch_size=batch["input_features"].size(0)
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):
         outputs = self.model(**batch)
         loss = outputs.loss.mean()
-        self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True, batch_size=batch["input_features"].size(0), sync_dist=True)
+        self.log(
+            "val_loss",
+            loss,
+            prog_bar=True,
+            on_step=False,
+            on_epoch=True,
+            batch_size=batch["input_features"].size(0),
+            sync_dist=True,
+        )
         return loss
 
     def configure_optimizers(self):
@@ -68,7 +78,9 @@ class WhisperSegLightningModule(pl.LightningModule):
         optimizer = AdamW(optimizer_grouped_parameters, lr=self.learning_rate)
 
         if self.lr_schedule == "linear" and self.total_training_steps:
-            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.warmup_steps, num_training_steps=self.total_training_steps)
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer, num_warmup_steps=self.warmup_steps, num_training_steps=self.total_training_steps
+            )
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
@@ -105,7 +117,6 @@ def run(
     n_device: int = 1,
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto",
     gpu_list: Optional[Sequence[int]] = None,
-    print_every: int = 100,
     max_num_epochs: int = 3,
     max_num_iterations: Optional[int] = None,
     min_num_iterations: Optional[int] = 500,
@@ -126,10 +137,21 @@ def run(
     ignore_cluster: int = 0,
     validate_every: Optional[int] = None,
     validate_per_epoch: int = 0,
-    save_every: Optional[int] = None,
-    save_per_epoch: int = 0,
 ):
-    """Train the segmenter using PyTorch Lightning."""
+    """Train the segmenter using PyTorch Lightning.
+
+    The `initial_model_path` argument can be a pretrained model on huggingface:
+    - openai/whisper-large
+    - openai/whisper-medium
+    - openai/whisper-small
+    - openai/whisper-base
+    - openai/whisper-tiny
+    - nccratliri/whisperseg-large-ms
+    - nccratliri/whisperseg-animal-vad
+    - nccratliri/whisperseg-base-animal-vad
+    - nccratliri/whisperseg-canary
+    - nccratliri/whisper-large
+    """
     if seed is not None:
         pl.seed_everything(seed, workers=True)
 
@@ -143,7 +165,9 @@ def run(
 
     audio_path_list_train, label_path_list_train = get_audio_and_label_paths(train_dataset_folder)
 
-    default_config = determine_default_config(audio_path_list_train, label_path_list_train, total_spec_columns, ignore_cluster=ignore_cluster)
+    default_config = determine_default_config(
+        audio_path_list_train, label_path_list_train, total_spec_columns, ignore_cluster=ignore_cluster
+    )
     model.config.default_segmentation_config = default_config
 
     initial_codebook = {} if clear_cluster_codebook else getattr(model.config, "cluster_codebook", {})
@@ -161,7 +185,9 @@ def run(
 
     val_dataloader = None
     if val_ratio > 0:
-        (audio_list_train, label_list_train), (audio_list_val, label_list_val) = train_val_split(audio_list_train, label_list_train, val_ratio)
+        (audio_list_train, label_list_train), (audio_list_val, label_list_val) = train_val_split(
+            audio_list_train, label_list_train, val_ratio
+        )
         audio_list_val, label_list_val = slice_audios_and_labels(audio_list_val, label_list_val, total_spec_columns)
         val_dataset = VocalSegDataset(
             audio_list_val,
