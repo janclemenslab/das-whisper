@@ -5,10 +5,17 @@ from tqdm import tqdm
 from copy import deepcopy
 from .datautils import get_audio_and_label_paths, read_label
 import os
+from typing import Union, Literal, Optional, Sequence
+import torch
+from pprint import pprint
 
 
 def evaluate(audio_list, label_list, segmenter, batch_size, max_length, num_trials, num_beams=4, target_cluster=None):
-    total_n_true_positive_segment_wise, total_n_positive_in_prediction_segment_wise, total_n_positive_in_label_segment_wise = 0, 0, 0
+    total_n_true_positive_segment_wise, total_n_positive_in_prediction_segment_wise, total_n_positive_in_label_segment_wise = (
+        0,
+        0,
+        0,
+    )
     total_n_true_positive_frame_wise, total_n_positive_in_prediction_frame_wise, total_n_positive_in_label_frame_wise = 0, 0, 0
 
     for audio, label in tqdm(zip(audio_list, label_list), total=len(audio_list)):
@@ -65,7 +72,16 @@ def evaluate(audio_list, label_list, segmenter, batch_size, max_length, num_tria
     return res
 
 
-def evaluate_dataset(dataset_folder, model_path, num_trials, max_length=448, num_beams=4, batch_size=8, device=None, device_ids=None):
+def evaluate_dataset(
+    dataset_folder: Union[str, bytes, os.PathLike],
+    model_path: Union[str, bytes, os.PathLike],
+    num_trials: int = 3,
+    max_length: int = 448,
+    num_beams: int = 4,
+    batch_size: int = 8,
+    device: Literal["cpu", "cuda", "mps", "auto"] = "auto",
+    device_ids: Optional[Sequence[int]] = None,
+):
     audio_list, label_list = [], []
     audio_paths, label_paths = get_audio_and_label_paths(dataset_folder)
     for audio_path, label_path in zip(audio_paths, label_paths):
@@ -98,3 +114,32 @@ def evaluate_dataset(dataset_folder, model_path, num_trials, max_length=448, num
         },
     }
     return all_res
+
+
+def run(
+    dataset_folder: str,
+    model_path: str,
+    num_trials: int = 3,
+    max_length: int = 448,
+    num_beams: int = 4,
+    batch_size: int = 8,
+    device: Literal["cpu", "cuda", "mps", "auto"] = "auto",
+    device_ids: Optional[Sequence[int]] = None,
+):
+    """Evalute whisperseg model on a dataset folder."""
+
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+
+    all_res = evaluate_dataset(
+        dataset_folder,
+        model_path,
+        num_trials,
+        max_length,
+        num_beams,
+        batch_size,
+        device,
+        device_ids,
+    )
+
+    pprint(all_res)

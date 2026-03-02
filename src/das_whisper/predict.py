@@ -1,5 +1,6 @@
 import os
 from .model import WhisperSegmenter
+from .datautils import download_data
 import librosa
 from tqdm import tqdm
 import pandas as pd

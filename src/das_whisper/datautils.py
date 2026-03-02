@@ -13,20 +13,23 @@ from huggingface_hub import snapshot_download
 import logging
 
 
-def download_data(data_path, local_data_path=Union[str, bytes, None, os.PathLike]):
+def download_data(data_path, local_data_path: Union[str, bytes, None, os.PathLike]):
     ## If data path is an existing local folder path then return immediataly
     if os.path.exists(data_path):
         logging.info(f"{data_path=} is a local dataset")
         return data_path
     else:  # Assume it's a dataset on hugginge face and attempt to download it
         if local_data_path is None:
-            local_data_path = "datasets"
+            local_data_path = "./"
 
+        data_path = data_path.replace("/train", "")
+        breakpoint()
         logging.info(f"Assuming {data_path=} is a dataset on huggingface. Trying to download it.")
         if not os.path.exists(data_path) or len(os.listdir(local_data_path)) == 0:
             os.makedirs(local_data_path, exist_ok=True)
-            snapshot_download(data_path, local_dir=f"{local_data_path}/{os.path.basename(data_path)}", repo_type="dataset")
-        return local_data_path
+            local_data_path = f"{local_data_path}/{data_path}"
+            snapshot_download(data_path, local_dir=local_data_path, repo_type="dataset")
+        return local_data_path + "/train"
 
 
 def read_label(label_path, default_config={}, ignore_cluster=False):
@@ -155,9 +158,7 @@ def load_audio_and_label(
         onset_arr = np.array(corrected_onsets)
         offset_arr = np.array(corrected_offsets)
 
-        valid_indices = np.logical_and(
-            np.logical_and(onset_arr < len(y) / label["sr"], offset_arr > 0), onset_arr <= offset_arr
-        )
+        valid_indices = np.logical_and(np.logical_and(onset_arr < len(y) / label["sr"], offset_arr > 0), onset_arr <= offset_arr)
         onset_arr = onset_arr[valid_indices]
         offset_arr = offset_arr[valid_indices]
         onset_arr[onset_arr < 0] = 0
@@ -366,9 +367,7 @@ class VocalSegDataset(Dataset):
         for label in label_list:
             key = "%s-%s-%s" % (str(label["sr"]), str(label["spec_time_step"]), str(label["min_frequency"]))
             if key not in feature_extractor_bank:
-                feature_extractor_bank[key] = WhisperSegFeatureExtractor(
-                    label["sr"], label["spec_time_step"], label["min_frequency"], chunk_length=max_clip_duration
-                )
+                feature_extractor_bank[key] = WhisperSegFeatureExtractor(label["sr"], label["spec_time_step"], label["min_frequency"], chunk_length=max_clip_duration)
         return feature_extractor_bank
 
     def map_time_to_spec_col_index(self, t, spec_time_step):
